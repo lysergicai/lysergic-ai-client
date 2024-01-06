@@ -127,12 +127,12 @@ def create_kohya_ss_start_script():
         shebang_line = "#!/bin/bash"
         script_ext = ".sh"
         activate_command = "source venv/bin/activate"
-        command_suffix = ""
+        command_suffix = "./"
 
     content = f"""{shebang_line}
 cd kohya_ss
 {activate_command}
-{command_suffix} gui{script_ext} --listen 0.0.0.0 --server_port 4204 --headless
+{command_suffix}gui{script_ext} --listen 0.0.0.0 --server_port 4204 --headless
 """
     script_path = os.path.join(SCRIPTS_DIR, f"kohya_ss{script_ext}")
     with open(script_path, "w") as f:
@@ -203,6 +203,7 @@ def create_lysergic_ai_script():
         shebang_line = "#!/bin/bash"
         script_ext = ".sh"
         activate_command = "source venv/bin/activate"
+        activate_env = "source .env"
         ngrok_command = "ngrok http $RANDOM_PORT --authtoken $NGROK_AUTH_TOKEN --domain $NGROK_DOMAIN &"
         uvicorn_command = "uvicorn main:app --host 0.0.0.0 --port $RANDOM_PORT --reload"
         random_port_generation = "RANDOM_PORT=$((8301 + RANDOM % 201))"
@@ -210,6 +211,7 @@ def create_lysergic_ai_script():
     content = f"""{shebang_line}
 cd api
 {activate_command}
+{activate_env}
 {random_port_generation}
 {ngrok_command}
 {uvicorn_command}
