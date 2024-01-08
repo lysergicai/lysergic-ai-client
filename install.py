@@ -9,25 +9,8 @@ import pkg_resources
 import threading
 import secrets
 import webbrowser
-import requests
-import sys
-import time
 
 SCRIPTS_DIR = "scripts"
-
-git_command = "git"
-
-def get_os():
-    """Returns the current OS: 'linux', 'windows', or 'mac'."""
-    os_name = platform.system().lower()
-    if "linux" in os_name:
-        return "linux"
-    elif "windows" in os_name:
-        return "windows"
-    elif "darwin" in os_name:  # MacOS
-        return "mac"
-    else:
-        raise ValueError("Unsupported OS detected.")
 
 def generate_random_string(length=32):
     """Generate a cryptographically secure random string of the given length."""
@@ -38,11 +21,15 @@ def ensure_scripts_dir():
     os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
 def clone_repositories():
+    # subprocess.run(["git", "clone", "-b", "release_candidate", "https://github.com/AUTOMATIC1111/stable-diffusion-webui", "stable-diffusion-webui"])
+    subprocess.run(["git", "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui", "stable-diffusion-webui"])
     
-    subprocess.run([git_command, "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui", "stable-diffusion-webui"])
-    subprocess.run([git_command, "clone", "https://github.com/bmaltais/kohya_ss.git", "kohya_ss"])
-    subprocess.run([git_command, "-C", "kohya_ss", "checkout", "397bf51a8cd36104e52055358e4ffd066c5858df"])
-    subprocess.run([git_command, "clone", "https://github.com/lysergicai/lysergic-ai-api.git", "api"])
+    # Clone kohya_ss and checkout specific commit
+    subprocess.run(["git", "clone", "https://github.com/bmaltais/kohya_ss.git", "kohya_ss"])
+    subprocess.run(["git", "-C", "kohya_ss", "checkout", "397bf51a8cd36104e52055358e4ffd066c5858df"])
+    
+    # Clone the lysergicai.com client api
+    subprocess.run(["git", "clone", "https://github.com/lysergicai/lysergic-ai-api.git", "api"])
 
 def create_env_file(SDAPIUSERNAME, SDAPIPASSWORD, NGROK_AUTH_TOKEN, NGROK_DOMAIN, SERVERID):
     env_path = os.path.join("api", ".env")
@@ -53,26 +40,16 @@ def create_env_file(SDAPIUSERNAME, SDAPIPASSWORD, NGROK_AUTH_TOKEN, NGROK_DOMAIN
         f.write(f"NGROK_DOMAIN={NGROK_DOMAIN}\n")
         f.write(f"SERVERID={SERVERID}\n")
 
-def download_file(url, destination):
-    """Download a file from a given URL to a specified destination."""
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
-    
-    with open(destination, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-
 def download_models():
     # Ensure the directory exists
     os.makedirs("stable-diffusion-webui/models/Stable-diffusion/XL", exist_ok=True)
-    os.makedirs("stable-diffusion-webui/models/VAE", exist_ok=True)
-
-    download_file("https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors", "stable-diffusion-webui/models/Stable-diffusion/XL/sd_xl_base_1.0.safetensors")
-    download_file("https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors", "stable-diffusion-webui/models/Stable-diffusion/XL/sd_xl_refiner_1.0.safetensors")
-    download_file("https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors", "stable-diffusion-webui/models/VAE/sdxl_vae.safetensors")
-
+    
+    subprocess.run(["wget", "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors", "-O", "stable-diffusion-webui/models/Stable-diffusion/XL/sd_xl_base_1.0.safetensors"])
+    subprocess.run(["wget", "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors", "-O", "stable-diffusion-webui/models/Stable-diffusion/XL/sd_xl_refiner_1.0.safetensors"])
+    subprocess.run(["wget", "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors", "-O", "stable-diffusion-webui/models/VAE/sdxl_vae.safetensors"])
+    
     # Clone adetailer repository to a temporary location
-    subprocess.run([git_command, "clone", "https://github.com/Bing-su/adetailer.git", "adetailer_tmp"])
+    subprocess.run(["git", "clone", "https://github.com/Bing-su/adetailer.git", "adetailer_tmp"])
     
     # Move the contents of adetailer_tmp to stable-diffusion-webui/extensions/adetailer
     adetailer_dest_path = "stable-diffusion-webui/extensions/adetailer"
@@ -90,81 +67,41 @@ def download_models():
     # Remove the temporary directory
     shutil.rmtree("adetailer_tmp")
 
+
 def create_sd_webui_start_script(SDAPIUSERNAME, SDAPIPASSWORD):
     ensure_scripts_dir()
-    os_type = get_os()
-    if os_type == "windows":
-        shebang_line = ""
-        script_ext = ".bat"
-        activate_command = "call venv\\Scripts\\activate.bat"
-        command_suffix = "call"
-    else:  # Linux and MacOS
-        shebang_line = "#!/bin/bash"
-        script_ext = ".sh"
-        activate_command = "source venv/bin/activate"
-        command_suffix = "bash"
-
-    content = f"""{shebang_line}
+    content = f"""#!/bin/bash
 cd stable-diffusion-webui
-{activate_command}
-{command_suffix} webui{script_ext} --port 7869 --xformers --api --cors-allow-origins=http://0.0.0.0:7869 --listen --no-half-vae --hide-ui-dir-config --gradio-auth {SDAPIUSERNAME}:{SDAPIPASSWORD} --api-auth {SDAPIUSERNAME}:{SDAPIPASSWORD}
+source venv/bin/activate
+bash webui.sh --port 7869 --xformers --api --cors-allow-origins=http://0.0.0.0:7869 --listen --no-half-vae --hide-ui-dir-config --gradio-auth {SDAPIUSERNAME}:{SDAPIPASSWORD} --api-auth {SDAPIUSERNAME}:{SDAPIPASSWORD}
 """
-    script_path = os.path.join(SCRIPTS_DIR, f"sd_webui{script_ext}")
+    script_path = os.path.join(SCRIPTS_DIR, "sd_webui.sh")
     with open(script_path, "w") as f:
         f.write(content)
-    if os_type != "windows":
-        os.chmod(script_path, 0o755)
+    os.chmod(script_path, 0o755)
 
 def create_kohya_ss_start_script():
     ensure_scripts_dir()
-    os_type = get_os()
-    if os_type == "windows":
-        shebang_line = ""
-        script_ext = ".bat"
-        activate_command = "call venv\\Scripts\\activate.bat"
-        command_suffix = "call"
-    else:  # Linux and MacOS
-        shebang_line = "#!/bin/bash"
-        script_ext = ".sh"
-        activate_command = "source venv/bin/activate"
-        command_suffix = "./"
-
-    content = f"""{shebang_line}
+    content = """#!/bin/bash
 cd kohya_ss
-{activate_command}
-{command_suffix}gui{script_ext} --listen 0.0.0.0 --server_port 4204 --headless
+source venv/bin/activate
+./gui.sh --listen 0.0.0.0 --server_port 4204 --headless
 """
-    script_path = os.path.join(SCRIPTS_DIR, f"kohya_ss{script_ext}")
+    script_path = os.path.join(SCRIPTS_DIR, "kohya_ss.sh")
     with open(script_path, "w") as f:
         f.write(content)
-    if os_type != "windows":
-        os.chmod(script_path, 0o755)
+    os.chmod(script_path, 0o755)
 
 def setup_kohya_ss():
-    os_type = get_os()
-    if os_type == "windows":
-        process = subprocess.Popen(["setup.bat"], cwd="kohya_ss", stdin=subprocess.PIPE, text=True, shell=True)
-        process.communicate(input="1\n2\n6\n")
-    else:  # Linux and MacOS
-        subprocess.run(["./setup.sh"], cwd="kohya_ss")
+    subprocess.run(["./setup.sh"], cwd="kohya_ss")
 
 def get_pip_path():
     base_dir = os.path.abspath("api")
-    os_type = get_os()
-    if os_type == "windows":
-        return os.path.join(base_dir, "venv", "Scripts", "pip.exe")
-    else:  # Linux and MacOS
-        return os.path.join(base_dir, "venv", "bin", "pip")
+    return os.path.join(base_dir, "venv", "bin", "pip")
 
 def setup_api_venv():
-    os_type = get_os()
-    if os_type == "windows":
-        python_executable = "python.exe"
-    else:  # Linux and MacOS
-        python_executable = "python"
-
     # Create the virtual environment
-    subprocess.run([python_executable, "-m", "venv", "venv"], cwd="api")
+    subprocess.run(["python", "-m", "venv", "venv"], cwd="api")
     
     # Install the requirements
     subprocess.run([get_pip_path(), "install", "-r", "requirements.txt"], cwd="api")
@@ -191,36 +128,19 @@ def modify_env_file():
 # Create the lysergic_ai.sh script
 def create_lysergic_ai_script():
     ensure_scripts_dir()
-    os_type = get_os()
-    if os_type == "windows":
-        shebang_line = ""  # Windows doesn't need a shebang line
-        script_ext = ".bat"
-        activate_command = "call venv\\Scripts\\activate.bat"
-        ngrok_command = "start ngrok http %RANDOM_PORT% --authtoken %NGROK_AUTH_TOKEN% --domain %NGROK_DOMAIN%"
-        uvicorn_command = "uvicorn main:app --host 0.0.0.0 --port %RANDOM_PORT% --reload"
-        random_port_generation = "set /a RANDOM_PORT=8301 + %RANDOM% %% 201"
-    else:  # Linux and MacOS
-        shebang_line = "#!/bin/bash"
-        script_ext = ".sh"
-        activate_command = "source venv/bin/activate"
-        activate_env = "source .env"
-        ngrok_command = "ngrok http $RANDOM_PORT --authtoken $NGROK_AUTH_TOKEN --domain $NGROK_DOMAIN &"
-        uvicorn_command = "uvicorn main:app --host 0.0.0.0 --port $RANDOM_PORT --reload"
-        random_port_generation = "RANDOM_PORT=$((8301 + RANDOM % 201))"
-
-    content = f"""{shebang_line}
+    content = """#!/bin/bash
 cd api
-{activate_command}
-{activate_env}
-{random_port_generation}
-{ngrok_command}
-{uvicorn_command}
+source venv/bin/activate
+source .env
+
+RANDOM_PORT=$((8301 + RANDOM % 201))
+ngrok http $RANDOM_PORT --authtoken $NGROK_AUTH_TOKEN --domain $NGROK_DOMAIN &
+uvicorn main:app --host 0.0.0.0 --port $RANDOM_PORT --reload
 """
-    script_path = os.path.join(SCRIPTS_DIR, f"lysergic_ai{script_ext}")
+    script_path = os.path.join(SCRIPTS_DIR, "lysergic_ai.sh")
     with open(script_path, "w") as f:
         f.write(content)
-    if os_type != "windows":
-        os.chmod(script_path, 0o755)
+    os.chmod(script_path, 0o755)
 
 # Generate the launch.py file
 def create_startup_script():
@@ -231,20 +151,9 @@ import psutil
 import platform
 import os
 
-def get_os():
-    os_name = platform.system().lower()
-    if "windows" in os_name:
-        return "windows"
-    elif "linux" in os_name:
-        return "linux"
-    elif "darwin" in os_name:
-        return "mac"
-    else:
-        return None
-
 def start_scripts():
     root = tk.Tk()
-    root.title("lysergicai.com Launcher")
+    root.title("LysergicAI.com Launcher")
 
     processes = {
         "kohya_ss": None,
@@ -252,27 +161,20 @@ def start_scripts():
         "lysergic_ai": None
     }
 
-    os_type = get_os()
-
-    if os_type == "windows":
-        commands = {
-            "kohya_ss": [r"scripts\kohya_ss.bat"],
-            "sd_webui": [r"scripts\sd_webui.bat"],
-            "lysergic_ai": [r"scripts\lysergic_ai.bat"]
-        }
-    else:
-        commands = {
-            "kohya_ss": ["./scripts/kohya_ss.sh"],
-            "sd_webui": ["./scripts/sd_webui.sh"],
-            "lysergic_ai": ["./scripts/lysergic_ai.sh"]
-        }
+    commands = {
+        "kohya_ss": ["./kohya_ss.sh"],
+        "sd_webui": ["./sd_webui.sh"],
+        "lysergic_ai": ["./lysergic_ai.sh"]
+    }
 
     def start_process(script):
         if processes[script] is None or processes[script].poll() is not None:
-            processes[script] = subprocess.Popen(commands[script], shell=True if os_type == "windows" else False)
+            processes[script] = subprocess.Popen(commands[script])
+
 
     def stop_process(script):
         process = processes[script]
+        
         if process:
             try:
                 parent = psutil.Process(process.pid)
@@ -283,14 +185,14 @@ def start_scripts():
                 pass
 
         # Clear terminal screen
-        if os_type == "windows":
+        system_name = platform.system()
+        if system_name == "Windows":
             os.system('cls')
         else:  # UNIX-like systems (Linux, MacOS)
             os.system('clear')
-
+        
         # Print the custom message to the terminal
         print(f"{script} stopped")
-        
         # Give the process a little time to terminate
         time.sleep(1)
 
@@ -301,6 +203,7 @@ def start_scripts():
             process.wait(timeout=5)
             if process.poll() is None:
                 process.kill()
+
 
     def update_status():
         for script, process in processes.items():
@@ -355,6 +258,7 @@ def start_scripts():
 
 if __name__ == "__main__":
     start_scripts()
+
 """
     # Modify the paths in the content to be relative to the scripts directory
     content = content.replace("./kohya_ss.sh", f"./{SCRIPTS_DIR}/kohya_ss.sh")
@@ -368,7 +272,7 @@ if __name__ == "__main__":
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("lysergicai.com Installer")
+        self.root.title("LysergicAI.com Installer")
 
         # Set the GUI dimensions
         self.root.geometry('800x600')
@@ -403,7 +307,7 @@ class App:
     def display_instructions(self):
         # Display the instructions using a Text widget for the clickable link
         self.instruction_text = tk.Text(self.main_frame, height=3, wrap=tk.WORD, bg=self.root.cget("background"), relief=tk.FLAT)
-        self.instruction_text.insert(tk.END, "Create your lysergicai.com server and get installation instructions at ")
+        self.instruction_text.insert(tk.END, "Create your LysergicAI.com server and get installation instructions at ")
         self.instruction_text.insert(tk.END, "lysergicai.com", "link")
         self.instruction_text.tag_configure("link", foreground="blue", underline=True)
         self.instruction_text.tag_bind("link", "<Button-1>", lambda e: webbrowser.open("https://lysergicai.com/servers?s=createnew"))
@@ -507,7 +411,7 @@ class App:
         self.submit_button.pack(pady=20)
 
     def show_completion_message(self):
-        ttk.Label(self.main_frame, text="✅ lysergicai.com installation is complete").pack(pady=20)
+        ttk.Label(self.main_frame, text="✅ LysergicAI.com installation is complete").pack(pady=20)
         
         start_server_btn = ttk.Button(self.main_frame, text="Launch", command=self.start_server)
         start_server_btn.pack(pady=20)
