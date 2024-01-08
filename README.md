@@ -2,15 +2,16 @@
 # lysergicai.com Client
 
 This script is an installer GUI that automatically configures your computer to interface with lysergicai.com privately. It consists of three core applications:
-1. [lysergicai.com client](https://github.com/lysergicai/lysergic-ai-client)
+1. [Lysergicai.com API](https://github.com/lysergicai/lysergic-ai-api)
 2. [Kohya_ss](https://github.com/bmaltais/kohya_ss)
 3. [Stable diffusion webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 
 ## Server requirements
 
+- Linux
 - NVIDIA GPU
 - [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux)
-- SSD with 30GB free
+- SSD with 30GB+ free
 
 ## Setup Instructions
 
@@ -64,5 +65,4 @@ This script is an installer GUI that automatically configures your computer to i
 ## Notes
 
 - Use any SDXL checkpoint by adding it to your 'lysergic-ai-client/stable-diffusion-webui/models/Stable-diffusion/XL' directory
-- Windows users will need to manually confirm a few GPU settings at the end of the installation process within Windows PowerShell
 
